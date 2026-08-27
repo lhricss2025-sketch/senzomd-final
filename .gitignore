@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Secrets & local env — NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Runtime data — never commit sessions, DBs, media or caches
+database/*.json
+database/*.tmp
+database/*.broken-*
+database/auth/
+database/auth_pair/
+database/status_saves/
+
+# Generated media
+media/

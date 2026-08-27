@@ -1,0 +1,166 @@
+═══════════════════════════════════════════════
+      SENZO MD — FULL COMMANDS LIST
+      Owner: 923021142153 / @Senzo268
+═══════════════════════════════════════════════
+[✅ = 100% working tested]  [⚠ = API backup chain, max reliability]
+
+──────────── MAIN ────────────
+.menu              — Premium bot menu (all commands)  ✅
+.ping              — Bot speed/status check  ✅
+.jid               — Channel/group link ya number se JID nikalein  ✅
+.getpfp            — Kisi bhi number ki profile picture (number ya reply)  ✅
+.font              — Stylish fonts (30+ styles)  ✅
+.qrcode            — Text se QR code (local)  ✅
+.calc              — Calculator (local)  ✅
+.hash              — SHA256/MD5 hash (local)  ✅
+.encode            — Base64 encode/decode (local)  ✅
+
+──────────── DOWNLOAD ────────────
+.ytmp3             — YouTube se MP3 (ytdl → yt-dlp → EliteYT backup)  ✅
+.ytmp4             — YouTube se MP4 + thumbnail & MP3/MP4 buttons  ✅
+.play              — Naam se search karke audio play  ✅
+.tiktok            — TikTok video (no watermark, tikwm + yt-dlp backup)  ⚠
+.igdl              — Instagram reels/post download (tikwm + yt-dlp backup)  ⚠
+.fbdl              — Facebook video download  ⚠
+.twitter / .x      — Twitter/X video download (tikwm chain)  ⚠
+.pinterest         — Pinterest images (Bing scrape + picsum backup)  ✅
+.apk               — APK search & download (Aptoide + EliteProTech backup)  ✅
+.elyrics(.lyrics)  — Song lyrics (lyrics.ovh + EliteProTech backup)  ✅
+.movie             — Movie details + poster (OMDb)  ✅
+.eliteyt (merged)  — EliteYT backup already inside .ytmp3/.ytmp4/.play  ✅
+
+──────────── AI ────────────
+.ai / .gpt         — AI chat (Pollinations verified + backups)  ✅
+.gemini            — Google Gemini (Pollinations + apinepdev backups)  ✅
+.dalle             — AI image (Pollinations + EliteProTech zonerai backup)  ✅
+
+──────────── VIEW ONCE ────────────
+.vv                — View-once media SAME chat mein download  ✅ (local)
+.vv2               — View-once media user ke INBOX mein  ✅ (local)
+
+──────────── STICKER ────────────
+.s                 — Image/video → sticker  ✅ (local)
+.sfull             — Full body/automatic sticker  ✅ (local)
+.take              — Sticker EXIF/pack change  ✅ (local)
+.attp              — Animated text sticker (Pillow + ffmpeg, local)  ✅ (local)
+.emojimix          — Emoji mix (Google Emoji Kitchen CDN)  ✅
+.quote             — Quote sticker (50 local quotes)  ✅ (local)
+
+──────────── GROUP ────────────
+.kick              — Member kick  ✅ (local)
+.add               — Member add  ✅ (local)
+.promote           — Admin banana  ✅ (local)
+.demote            — Admin hatana  ✅ (local)
+.warn              — Warn (3 warns = auto kick)  ✅ (local)
+.warnings          — Warn count check  ✅ (local)
+.resetwarn         — Warn reset  ✅ (local)
+.antilink          — Link auto-delete + warn  ✅ (local)
+.channelwarn       — WhatsApp channel link auto-delete + warn  ✅ (local)
+.welcome / .setwelcome  — Welcome messages (premium templates)  ✅ (local)
+.bye / .setbye     — Bye messages (templates)  ✅ (local)
+.tagall            — Sab ko tag (restrictions bypass)  ✅ (local)
+.hidetag           — Tag without @  ✅ (local)
+.grouplink         — Group invite link  ✅ (local)
+.groupinfo         — Group details  ✅ (local)
+.public            — Group/DM public mode  ✅ (local)
+.private           — Group/DM private mode  ✅ (local)
+
+──────────── ISLAMIC ────────────
+.azan              — Prayer times (aladhan — free official)  ✅
+.quran             — Surah:Ayat + Urdu tarjuma (alquran.cloud)  ✅
+.hadith            — Random hadith (local collection)  ✅ (local)
+.duas              — Masnoon duas (local)  ✅ (local)
+.names             — 99 Names voice MP3 (Archive.org)  ✅
+.hijri             — Aaj ki Islamic date (aladhan)  ✅
+
+──────────── HACKER / OSINT ────────────
+.sherlock          — Username → 500+ sites scan → .txt file  ✅ (local tool)
+.metadata          — Pic ki EXIF: GPS, camera, date (local)  ✅ (local)
+.info              — Media ki full technical info (local)  ✅ (local)
+.status-down       — WhatsApp status download (reply se)  ✅ (local)
+.scribd            — Scribd document → PDF  ✅
+.whois             — Domain registration details (RDAP official)  ✅
+.gitstalk          — GitHub user profile + avatar  ✅
+.gitclone          — GitHub repo ZIP download  ✅
+.nasa              — NASA aaj ki photo (APOD official)  ✅
+.bin               — Card BIN lookup (binlist.net)  ✅
+
+──────────── FUN ────────────
+.anime             — Anime images (nekos.life)  ✅
+.wallpaper         — Wallpapers (Bing scrape + picsum)  ✅
+.meme              — Random memes  ✅
+.trivia            — Quiz questions (opentdb)  ✅
+.facts             — Random facts  ✅
+.horoscope         — Daily horoscope  ✅
+.weather           — Weather (open-meteo — free official)  ✅
+
+──────────── TOOLS ────────────
+.tr                — Translate (Google + MyMemory backup)  ✅
+.tts               — Text to speech (Google free)  ✅
+.currency          — Currency convert (open.er-api + frankfurter)  ✅
+.ip                — IP lookup (ipwho.is)  ✅
+.news              — Latest news (Hacker News — lifetime)  ✅
+.lyrics            — Song lyrics  ✅
+.remind            — Reminder set  ✅
+.time              — World time  ✅
+.transcript        — YouTube video ki full transcript → .txt file  ✅
+
+──────────── GAMES / ECONOMY ────────────
+.dice              — Dice roll  ✅ (local)
+.coin              — Coin flip  ✅ (local)
+.slots             — Slot machine  ✅ (local)
+.quiz              — Quiz game  ✅ (local)
+.tictactoe         — Tic-tac-toe  ✅ (local)
+.truth             — Truth or dare  ✅ (local)
+.daily             — Daily reward  ✅ (local)
+.balance           — Balance check  ✅ (local)
+.give              — Money gift  ✅ (local)
+.leaderboard       — Top players  ✅ (local)
+
+──────────── REFERRAL (boost gate) ────────────
+.join CODE         — Kisi ka referral code join karein (reactions/votes unlock)  ✅
+.referral          — Apni referral stats + code  ✅ (local)
+NOTE: .join hamesha REFERRAL command hai (owner ke joingc ka alias ab nahi).
+
+──────────── AUTO BEHAVIOR (NEW) ────────────
+.autoreact on/off  — Kisi bhi message par auto emoji reaction  ✅ (local)
+.autotyping on/off — Chat mein auto typing indicator  ✅ (local)
+.autostatus on/off — Status pics/videos auto-save  ✅ (local)
+
+──────────── BOOST ────────────
+.freacts           — Post par fake reactions (5 referrals unlock, referral-safe logic)  ✅
+.fvotes            — Poll votes (referral unlock, 1 vote per account)  ✅
+.referral          — Referral stats + link  ✅ (local)
+.join              — Referral link se join  ✅ (local)
+
+──────────── OWNER ────────────
+.owner             — Owner info  ✅ (local)
+.broadcast         — Sab users ko message  ✅ (local)
+.premium           — Premium users manage  ✅ (local)
+.ban               — User ban  ✅ (local)
+.block             — User block  ✅ (local)
+.mode              — Paid/Free mode  ✅ (local)
+.restart           — Bot restart  ✅ (local)
+.joingc            — Group join by link  ✅ (local)
+.leave             — Group leave  ✅ (local)
+
+──────────── TELEGRAM PANEL (ADMIN) ────────────
+/start             — Panel open (pic/video change + settings)  ✅
+/pair              — WhatsApp pairing code  ✅
+/broadcast         — WhatsApp users ko broadcast  ✅
+/addchannel        — Auto-join channel set (link → newsletter JID)  ✅
+/removechannel     — Channel remove  ✅
+/channels          — Auto-join channels list  ✅
+/mode              — Paid/Free mode toggle  ✅
+/referral          — Referral system manage  ✅
+/settings          — All bot settings  ✅
+
+═══════════════════════════════════════════════
+NOTES:
+• Prefix: .  (dot)
+• Total: 128+ unique commands
+• ✅ (local) = koi API nahi — kabhi expire nahi hoga
+• ⚠ = free APIs + 2-3 backup chain; fail hone par automatic next API try
+• Deploy: GitHub → Railway → env vars (TG_TOKEN, ADMIN_CHAT_ID, OWNER_NUMBER) → start → Telegram /start → pairing
+• Security: TG_TOKEN sirf environment se — koi hardcoded token nahi; .env git-ignored
+═══════════════════════════════════════════════

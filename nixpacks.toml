@@ -1,0 +1,14 @@
+# SENZO MD — Nixpacks build config (Railway)
+# ffmpeg + python3 are required by .attp / .sticker / .transcript features.
+# yt-dlp + pillow + sherlock-project are installed best-effort:
+# the build does NOT fail if they can't be installed (features degrade gracefully).
+
+[phases.setup]
+aptPkgs = ["ffmpeg", "python3", "python3-pip", "fonts-dejavu-core"]
+
+[phases.install]
+cmds = [
+  "python3 -m pip install --no-cache-dir --break-system-packages pillow yt-dlp || true",
+  "python3 -m pip install --no-cache-dir --break-system-packages sherlock-project || true",
+  "npm install --no-audit --no-fund"
+]

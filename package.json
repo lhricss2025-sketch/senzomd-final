@@ -1,0 +1,41 @@
+{
+  "name": "senzo-md",
+  "version": "1.0.1",
+  "description": "Powerful WhatsApp & Telegram Bot — SENZO MD (production-hardened)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node test_live.js"
+  },
+  "keywords": [
+    "whatsapp-bot",
+    "telegram-bot",
+    "senzo-md",
+    "baileys"
+  ],
+  "author": "Senzo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "axios": "^1.7.7",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.7",
+    "exifr": "^7.1.3",
+    "figlet": "^1.7.0",
+    "google-tts-api": "^2.0.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "pino": "^8.16.2",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.32.6",
+    "wa-sticker-formatter": "^4.4.4",
+    "yt-search": "^2.12.1",
+    "ytdl-core": "^4.11.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
