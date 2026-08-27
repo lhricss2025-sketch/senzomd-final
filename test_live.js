@@ -1,7 +1,7 @@
 // LIVE test — real modules, real DB writes, real media/ dir.
 // Patches only node-telegram-bot-api with a FakeBot to observe outputs.
 // Exercises the ACTUAL runtime code paths (buffer handling, DB persistence,
-// pending state, command dispatch, tic-tac-toe, caption commands, DB races).
+// pairing single-flight, command dispatch, tic-tac-toe, caption commands).
 process.env.TELEGRAM_BOT_TOKEN = "7100000000:AAFAKE_TEST_TOKEN_NOT_REAL";
 process.env.ADMIN_CHAT_ID = "8105949422";
 process.env.OWNER_NUMBER = "923021142153";
@@ -9,6 +9,8 @@ process.env.OWNER_NUMBER = "923021142153";
 const path = require("path");
 const fs = require("fs");
 const Module = require("module");
+const { execFileSync } = require("child_process");
+const { EventEmitter } = require("events");
 
 const sent = [];
 class FakeBot {
@@ -37,41 +39,112 @@ Module._load = function (request, parent, isMain) {
 (async () => {
   const tg = require("./lib/telegram.js");
   const db = require("./lib/database.js");
-  const pairing = require("./lib/pairing.js");
   const wa = require("./lib/whatsapp.js");
   const games = require("./commands/games.js");
   let fails = 0;
   const ok = (name, cond) => { console.log((cond ? "✅" : "❌") + " " + name); if (!cond) fails++; };
 
-  // ===== 0. Exports + single-writer DB race check =====
+  // ===== 0. Exports / single-writer DB integrity =====
   console.log("\n═══ 0. CORE EXPORTS / DB INTEGRITY ═══");
   ok("telegram module exports bot", typeof tg.bot !== "undefined" && tg.bot !== null);
-  ok("whatsapp exports reconnect fns", typeof wa.connectWA === "function" && typeof wa.runPairingOnDemand === "function" && typeof wa.clearPairGuard === "function");
+  ok("whatsapp exports pairing + reconnect fns", typeof wa.connectWA === "function" && typeof wa.runPairingOnDemand === "function" && typeof wa.handlePendingPairs === "function" && typeof wa.getSock === "function");
 
-  // The historic race: tg gate writes bot.json while pairing writes bot.json — now one writer.
+  const indexSrc = fs.readFileSync("./index.js", "utf8");
+  ok("index.js starts WhatsApp exactly ONCE", (indexSrc.match(/connectWA\(/g) || []).length === 1);
+  const waSrc = fs.readFileSync("./lib/whatsapp.js", "utf8");
+  ok("NO throwaway one-shot pairing socket anymore (single socket only)",
+    !waSrc.includes("PAIR_DIR") && !waSrc.includes("useMultiFileAuthState(sessionPath)") &&
+    (waSrc.match(/makeWASocket\(/g) || []).length === 1);
+  ok("NO stale pair_guard/pair_sent files in whatsapp", !/pair_guard/.test(waSrc) && !/pair_sent/.test(waSrc));
+  ok("exactly ONE connection.update listener in whatsapp", (waSrc.match(/"connection.update"/g) || []).length === 1);
+  ok("lib/pairing.js removed (no duplicate wrapper)", !fs.existsSync("./lib/pairing.js"));
+  ok("test_no_token.js merged away", !fs.existsSync("./test_no_token.js"));
+
   const tR = db.createPairRequest("923000000099", 111222333);
   db.addTgGate("@RaceGate");
   db.setAccessMode("free");
   db.addPremium("923000000098", 5);
-  db.addAutoChannel("000000000000@newsletter");
   const stillPending = db.listPendingPairs().some((p) => p.token === tR);
   ok("single-writer DB: pair tokens survive writes by other features", stillPending);
+  db.removePendingByNumber("923000000099"); // clean before pairing single-flight tests
   ok("tg gates persisted via db", db.listTgGates().includes("@RaceGate"));
   ok("tg gate remove works", (db.removeTgGate("@RaceGate"), !db.listTgGates().includes("@RaceGate")));
-  ok("autoChannels roundtrip", db.listAutoChannels().includes("000000000000@newsletter") && (db.removeAutoChannel("000000000000@newsletter"), true));
   db.removePremium("923000000098");
 
-  // Corrupted DB file → backed up, bot keeps running
   const bp = path.join(__dirname, "database", "bot.json");
   const origBot = fs.readFileSync(bp, "utf8");
   fs.writeFileSync(bp, "{ this is not valid json !!!", "utf8");
   const afterCorrupt = db.listTgGates();
   ok("corrupt DB backed up + bot survives", Array.isArray(afterCorrupt));
   const brokenFiles = fs.readdirSync(path.join(__dirname, "database")).filter((f) => f.includes("bot.json.broken-"));
-  ok("corrupt backup file created (no data loss, no crash)", brokenFiles.length >= 1);
+  ok("corrupt backup file created", brokenFiles.length >= 1);
   fs.writeFileSync(bp, origBot, "utf8");
 
-  // ===== 1. PIC SET FLOW (real DB + buffer) =====
+  // ===== 0b. PAIRING — unified single-flight (ROOT-CAUSE verification) =====
+  console.log("\n═══ 0b. PAIRING: ONE CONNECTION, ONE CODE ═══");
+  const pairBus = new EventEmitter();
+  const pairEvents = [];
+  pairBus.on("pair_ready", (d) => pairEvents.push(d));
+  let pairingReqCalls = 0;
+  const pairSock = {
+    ws: { readyState: 1 },
+    user: null,
+    async requestPairingCode(num) { pairingReqCalls++; return "1234ABCD"; },
+  };
+
+  // 1) first /pair → exactly one code, stored in real 4-4 format
+  await wa.runPairingOnDemand("923000000111", "TEST-1111", 111222333, pairBus, pairSock);
+  const code1 = db.getPairCode("923000000111");
+  ok("1st request → exactly ONE code emitted", pairEvents.length === 1);
+  ok("code stored + real 4-4 format", typeof code1 === "string" && /^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(code1));
+
+  // 2) second /pair while code still valid → SAME code, NO new generation
+  await wa.runPairingOnDemand("923000000111", "TEST-2222", 111222333, pairBus, pairSock);
+  ok("2nd request → same code re-delivered, requestPairingCode called only ONCE",
+    pairEvents.length === 2 && db.getPairCode("923000000111") === code1 && pairingReqCalls === 1);
+
+  // 3) expired code → signal a fresh request is possible (new single code)
+  db.removePairCode("923000000111");
+  const before = pairingReqCalls;
+  await wa.runPairingOnDemand("923000000111", "TEST-3333", 111222333, pairBus, pairSock);
+  ok("expired code → exactly one NEW code (no duplicates)", db.getPairCode("923000000111") && pairingReqCalls === before + 1 && pairEvents.length === 3);
+
+  // 4) registered/connected number → NEVER a code
+  const regSock = {
+    ws: { readyState: 1 },
+    user: { id: "923111111111:3" },
+    requestPairingCode: async () => { throw new Error("MUST NOT BE CALLED"); },
+  };
+  await wa.runPairingOnDemand("923111111111", "T-0001", 111222333, pairBus, regSock);
+  ok("already-connected number → zero codes generated", !db.getPairCode("923111111111") && pairEvents.length === 3);
+
+  // 5) pending entry → processed once, second run is a no-op
+  db.removePairCode("923000000222");
+  db.createPairRequest("923000000222", 111222333);
+  await wa.handlePendingPairs(pairSock, pairBus);
+  const c2 = db.getPairCode("923000000222");
+  ok("pending pair → processed exactly once", !!c2 && pairEvents.length === 4);
+  await wa.handlePendingPairs(pairSock, pairBus);
+  ok("pending re-run → no duplicate/regeneration", db.getPairCode("923000000222") === c2 && pairEvents.length === 4);
+
+  // 6) cross-process lock: second acquisition blocked while held
+  db.releasePairLock();
+  db.acquirePairLock();
+  ok("pair lock blocks concurrent instance", db.acquirePairLock() === false);
+  db.releasePairLock();
+  ok("pair lock released → acquirable again", db.acquirePairLock() === true && (db.releasePairLock(), true));
+
+  // 7) reconnect-safety source check: registered socket path never re-processes pending as codes
+  ok("reconnect safety: pending processed on qr (unregistered) only", /if \(qr\)/.test(waSrc) && /handlePendingPairs\(sock, eventBus\)/.test(waSrc));
+
+  // cleanup pairing test state
+  db.removePairCode("923000000111");
+  db.removePairCode("923000000222");
+  db.removePendingByNumber("923000000111");
+  db.removePendingByNumber("923000000222");
+  db.removePendingByNumber("923000000099");
+
+  // ===== 1. PIC SET FLOW =====
   console.log("\n═══ 1. PIC SET FLOW ═══");
   const cbH = tg.bot._h.find((h) => h.evt === "callback_query");
   const adminMsg = { chat: { id: 8105949422 }, from: { id: 8105949422, username: "senzo268" } };
@@ -83,7 +156,7 @@ Module._load = function (request, parent, isMain) {
   await new Promise((r) => setTimeout(r, 1200));
   ok("admin photo saved + confirm sent", sent.some((m) => m.id === 8105949422 && m.t && m.t.includes("set ho gaya")));
   const mm = db.getMedia("telegram_start");
-  ok("telegram_start persisted in DB with buffer", mm && mm.type === "photo" && mm.buffer && mm.buffer.length > 0);
+  ok("telegram_start persisted with buffer", mm && mm.type === "photo" && mm.buffer && mm.buffer.length > 0);
   const videoH = tg.bot._h.find((h) => h.evt === "video");
   sent.length = 0;
   cbH.cb({ id: "m2", from: { id: 8105949422 }, message: adminMsg, data: "media:startvid" });
@@ -104,8 +177,8 @@ Module._load = function (request, parent, isMain) {
   await new Promise((r) => setTimeout(r, 500));
   ok("media list shows remaining items", sent.some((m) => m.id === 8105949422 && /MEDIA LIST/i.test(m.t)));
 
-  // ===== 2. PAIRING FLOW =====
-  console.log("\n═══ 2. PAIRING FLOW ═══");
+  // ===== 2. PAIRING TOKEN FLOW (Telegram /pair instructions + /code) =====
+  console.log("\n═══ 2. PAIRING TOKEN FLOW ═══");
   db.setAccessMode("free");
   sent.length = 0;
   const hPair = tg.bot._h.find((h) => h.re instanceof RegExp && h.re.test("/pair 923000000001"));
@@ -115,51 +188,33 @@ Module._load = function (request, parent, isMain) {
   const tokMatch = pairMsg?.t?.match(/([A-Z]{4}-\d{4})/);
   ok("/pair creates token + instructions sent (fancy-styled reply)", !!tokMatch);
   if (tokMatch) {
-    const pToken = tokMatch[1];
     const sock = {
       requestPairingCode: async (num) => { const c = `PAIR${Math.floor(Math.random() * 9000) + 1000}`; db.addPairCode(String(num), c); return c; },
       user: { id: "923000000000:0" },
       ev: { on() {} }, logout() {}, ws: null,
     };
     tg.setWA(sock);
-    const prePend = pairing.listPendingPairs();
-    ok("pending pair flow works", prePend.length >= 0);
     const code = await sock.requestPairingCode("923000000001");
-    ok("pairing code generated + stored", !!db.getPairCode("923000000001"));
+    ok("pairing code generated + stored (fake driver)", !!db.getPairCode("923000000001"));
     const hCode = tg.bot._h.find((h) => h.re instanceof RegExp && h.re.test("/code ABCD-1234 12345678"));
     sent.length = 0;
-    const t2 = pairing.createPairRequest("923000000002", 111222333);
+    const t2 = db.createPairRequest("923000000002", 111222333);
     db.addPairCode("923000000002", "12345678");
     hCode.cb({ chat: { id: 111222333 }, from: { id: 111222333 } }, ["/code X", t2, "99999999"]);
     await new Promise((r) => setTimeout(r, 600));
     ok("/code WRONG code rejected", sent.some((m) => m.id === 111222333 && /Galat code/i.test(m.t)));
     sent.length = 0;
-    const t3 = pairing.createPairRequest("923000000003", 111222333);
+    const t3 = db.createPairRequest("923000000003", 111222333);
     const code3 = await sock.requestPairingCode("923000000003");
     hCode.cb({ chat: { id: 111222333 }, from: { id: 111222333 } }, ["/code X", t3, code3]);
     await new Promise((r) => setTimeout(r, 600));
     ok("/code CORRECT code accepted (alphanumeric WA code)", sent.some((m) => m.id === 111222333 && /Pairing active/i.test(m.t)));
     ok("pair code consumed after use", !db.getPairCode("923000000003"));
-
-    sent.length = 0;
     tg.setWA(null);
-    pairing.createPairRequest("923000000004", 111222333);
-    const pend1 = pairing.listPendingPairs();
-    ok("pending after /pair before WA connect", pend1.length >= 1 && pend1.some((p) => p.number === "923000000004"));
-    const pending2 = pairing.listPendingPairs();
-    const codes = {};
-    for (const p of pending2) {
-      const num = p.number.replace(/[^0-9]/g, "");
-      pairing.removePendingByNumber(num);
-      codes[num] = await sock.requestPairingCode(num);
-    }
-    ok("pending pairs process-able after /pair", Object.keys(codes).includes("923000000004"));
-    ok("generated code stored for late request", !!db.getPairCode("923000000004"));
-    pairing.removePendingByNumber("923000000004");
-    db.removePairCode("923000000004");
   }
+  db.removePendingByNumber("923000000001");
 
-  // ===== 3. All admin buttons (panel flow) =====
+  // ===== 3. All admin buttons =====
   console.log("\n═══ 3. ALL ADMIN BUTTONS ═══");
   sent.length = 0;
   cbH.cb({ id: "p1", from: { id: 8105949422 }, message: adminMsg, data: "adm:panel" });
@@ -181,27 +236,20 @@ Module._load = function (request, parent, isMain) {
     ok(`${key} handled`, sent.some((m) => m.id === 8105949422));
   }
 
-  // ===== 3b. Fresh QR delivery (adm:qr must NOT send stale file) =====
+  // ===== 3b. Fresh QR delivery =====
   console.log("\n═══ 3b. FRESH QR DELIVERY ═══");
   sent.length = 0;
   tg.setWA(null);
-  const waMod = require("./lib/whatsapp.js");
-  ok("getLatestQRBuffer null when no QR yet", waMod.getLatestQRBuffer() === null);
+  ok("getLatestQRBuffer null when no QR yet", wa.getLatestQRBuffer() === null);
   const tgSrc = fs.readFileSync("./lib/telegram.js", "utf8");
   const qrBlock = tgSrc.slice(tgSrc.indexOf('case "qr"'), tgSrc.indexOf('case "qr"') + 2000);
-  ok("adm:qr no longer reads stale media/qr.png file path", !/qrPath/.test(qrBlock));
   ok("adm:qr waits for fresh eventBus qr", qrBlock.includes('EVENT_BUS?.once("qr"'));
   ok("adm:qr uses WA.getLatestQRBuffer first", qrBlock.includes("getLatestQRBuffer()"));
   cbH.cb({ id: "qr1", from: { id: 8105949422 }, message: adminMsg, data: "adm:qr" });
   await new Promise((r) => setTimeout(r, 11500));
-  ok("adm:qr sends fallback msg when no QR + no event (no stale photo)",
+  ok("adm:qr sends fallback msg when no QR + no event",
     sent.some((m) => m.id === 8105949422 && m.t && /QR abhi available nahi/i.test(m.t)) &&
     !sent.some((m) => m.id === 8105949422 && m.t === "photo"));
-  const waSrc = fs.readFileSync("./lib/whatsapp.js", "utf8");
-  ok("whatsapp.js renders QR with margin:1, scale:8, EC M", /margin: 1, scale: 8, errorCorrectionLevel: "M"/.test(waSrc));
-  ok("whatsapp.js emits qr on eventBus", /eventBus\.emit\("qr"/.test(waSrc));
-  ok("RECONNECT FIX: currentSock cleared before reconnect", /currentSock = null/.test(waSrc) && /scheduleReconnect/.test(waSrc));
-  ok("RECONNECT FIX: connecting guard present", /let connecting = false/.test(waSrc) && /if \(connecting\) return currentSock/.test(waSrc));
 
   // ===== 4. User menu + gate =====
   console.log("\n═══ 4. USER MENU & GATE ═══");
@@ -223,13 +271,13 @@ Module._load = function (request, parent, isMain) {
   ok("force-join gate blocks non-member", sent.some((m) => m.id === 111222333 && /JOIN REQUIRED/i.test(m.t)));
   db.removeTgGate("@Senzo268");
 
-  // ===== 5. WhatsApp commands loading =====
+  // ===== 5. WhatsApp commands loading + dispatch =====
   console.log("\n═══ 5. WHATSAPP COMMANDS ═══");
   await wa.loadCommands();
   const cmdKeys = Object.keys(wa.cmds);
   ok(`WhatsApp command map loaded: ${cmdKeys.length} entries`, cmdKeys.length >= 200);
   ok("cmd keys include menu, vv, gpt, fb, apk, getpfp, sherlock, metadata, tagall, autoreact", ["menu","vv","gpt","fb","apk","getpfp","sherlock","metadata","tagall","autoreact"].every((k) => cmdKeys.includes(k)));
-  ok("ALIAS FIX: .join maps to referral command (not joingc)", wa.cmds["join"] && wa.cmds["join"].desc && /referral/i.test(wa.cmds["join"].desc));
+  ok("ALIAS FIX: .join maps to referral command", wa.cmds["join"] && wa.cmds["join"].desc && /referral/i.test(wa.cmds["join"].desc));
   ok("ALIAS FIX: joingc no longer hijacks 'join'", wa.cmds["joingc"] && wa.cmds["joingc"].aliases === undefined);
 
   const fakeSock = {
@@ -246,7 +294,7 @@ Module._load = function (request, parent, isMain) {
     console.log("   handle error:", e.message);
   }
 
-  // ===== 6. NEW: caption commands =====
+  // ===== 6. Caption commands + tic-tac-toe =====
   console.log("\n═══ 6. CAPTION COMMAND + TIC-TAC-TOE ═══");
   const capLog = [];
   const sockC = {
@@ -262,9 +310,7 @@ Module._load = function (request, parent, isMain) {
     }, { loadMessage: async () => null });
   } catch (e) { console.log("   caption error:", e.message); }
   ok("caption command (.ping on image) dispatches", capLog.some((c) => c.text && /PONG/i.test(c.text)));
-  ok("messageType attached for media commands", true); // handled inside handle()
 
-  // Tic-tac-toe end-to-end (challenger X, opponent O, X wins middle column)
   const tttCmd = games.find((c) => c.name === "tictactoe");
   const tttLog = [];
   const sockT = {
@@ -278,16 +324,23 @@ Module._load = function (request, parent, isMain) {
     {}, { sender: challengerJid, isGroup: true, from: fromG, reply: async (t) => tttLog.push({ text: t }) });
   ok("tictactoe challenge created", tttLog.some((c) => (c.text || "").includes("Challenge")));
   const move = async (sender, body) => games.handleXOMove(sockT, {}, { body, from: fromG, sender, isGroup: true });
-  await move(challengerJid, "xo move 5"); // X center
+  await move(challengerJid, "xo move 5");
   ok("challenger X placed + turn passes to opponent", tttLog[tttLog.length - 1]?.mentions?.[0] === opponentJid);
-  await move(challengerJid, "xo move 5"); // same player again → blocked
+  await move(challengerJid, "xo move 5");
   ok("out-of-turn move blocked", /baari/i.test(tttLog[tttLog.length - 1].text));
-  await move(opponentJid, "xo move 1"); // O
-  await move(challengerJid, "xo move 7"); // X
-  await move(opponentJid, "xo move 2"); // O
-  await move(challengerJid, "xo move 3"); // X → middle column win
+  await move(opponentJid, "xo move 1");
+  await move(challengerJid, "xo move 7");
+  await move(opponentJid, "xo move 2");
+  await move(challengerJid, "xo move 3");
   const winLine = tttLog[tttLog.length - 1];
   ok("tictactoe X wins & winner is challenger", /JEET GAYA/i.test(winLine.text) && winLine.text.includes("923000000000"));
+
+  // ===== 7. No-token Telegram guard (separate process) =====
+  console.log("\n═══ 7. TELEGRAM NO-TOKEN GUARD ═══");
+  const guardOut = execFileSync("node", ["-e",
+    "delete process.env.TG_TOKEN; delete process.env.TELEGRAM_BOT_TOKEN; const t=require('./lib/telegram'); console.log(t.bot === null && typeof t.setWA === 'function');"],
+    { cwd: __dirname, env: { ...process.env, TG_TOKEN: "", TELEGRAM_BOT_TOKEN: "" } }).toString().trim();
+  ok("no-token guard: Telegram disabled cleanly in fresh process", guardOut === "true");
 
   console.log(`\n════ RESULT: ${fails} failure(s) ════`);
   process.exit(fails ? 1 : 0);

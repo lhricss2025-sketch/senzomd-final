@@ -163,4 +163,5 @@ NOTES:
 • ⚠ = free APIs + 2-3 backup chain; fail hone par automatic next API try
 • Deploy: GitHub → Railway → env vars (TG_TOKEN, ADMIN_CHAT_ID, OWNER_NUMBER) → start → Telegram /start → pairing
 • Security: TG_TOKEN sirf environment se — koi hardcoded token nahi; .env git-ignored
+• Pairing: har request par SIRF EK real WhatsApp code — valid code dobara resend hota hai (2 codes kabhi nahi); bot connected ho to koi code nahi
 ═══════════════════════════════════════════════

@@ -61,10 +61,10 @@ console.log(chalk.cyan("══════════════════�
   tg.setWA(sock);
   tg.setEventBus(eventBus);
 
-  // Logout hone par guard reset — taake same number dobara /pair kar sake
+  // Logout hone par pairing state saaf karo — taake same number dobara /pair kar sake
   eventBus.on("wa_logged_out", () => {
-    try { wa.clearPairGuard(cfg.OWNER_NUMBER); } catch {}
     try { dbx.removePairCode(cfg.OWNER_NUMBER); } catch {}
+    try { dbx.removePendingByNumber(cfg.OWNER_NUMBER); } catch {}
   });
 
   // Jab WhatsApp se pairing code ready ho, Telegram user ko batayein
@@ -99,6 +99,16 @@ _"Code not valid" aaye? /pair ${number} dobara bhejein._`,
 WhatsApp mein: Settings → Linked Devices → Link with Phone Number → apna number (${number}) dalein.`,
         ).catch(() => {});
       }
+    }
+  });
+
+  // Agar account pehle se connected hai toh batayein (koi naya code generate NAHI hota)
+  eventBus.on("pair_status", ({ number, chatId, type, as }) => {
+    if (!tg.bot || !chatId) return;
+    if (type === "already") {
+      botNotify(chatId, `✅ *Already Connected*\n\nBot pehle se *${number}* ke saath pair hai — koi naya code generate nahi hua.\n\nWhatsApp mein: Linked Devices check karein ✓`);
+    } else if (type === "connected_other") {
+      botNotify(chatId, `✅ *Bot connected as ${as}*\n\nEk hi WhatsApp account pair ho sakta hai. Pehle phone se *logout* karein, phir \`/pair ${number}\` dobara bhejein.`);
     }
   });
 

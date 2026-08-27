@@ -98,18 +98,35 @@ Process notes:
 - No web port is opened — this is a worker process; no health-check endpoint
   is needed. Railway monitors the process itself.
 
-## 6. Pairing (bina QR ke)
+## 6. Pairing (bina QR ke) — UNIFIED, ONE CODE
+
+Bot ka **single WhatsApp identity** (`database/auth`) hi sab kuch hai — pairing
+code request USI main socket par hota hai. Koi throwaway session nahi hai.
 
 1. Telegram: `/pair 923XXXXXXXXXX`
 2. WhatsApp app → **Settings → Linked Devices → Link a Device →
-   “Link with phone number instead”** → apna number enter karein.
-3. Phone screen par 8-digit code aata hai — bot ki `/pair` reply mein wohi
-   code bhi aata hai (button **🔄 Check Status** se confirm karein).
-4. Phone par code enter karein → connected ✓.
-5. `/unpair` / `/status` — connection status. Logout phone se karein to
-   session saaf ho jata hai aur dobara pair kar sakte hain.
-6. Fallback: **Pairing → Send QR** — fresh QR Telegram par aata hai
-   (kabhi stale file nahi bheji jati).
+   "Link with phone number instead"** → apna number enter karein.
+3. Phone par jo 8-digit code aaye, bot ki `/pair` reply mein **WOHI code**
+   aata hai (button **🔄 Check Status** se confirm karein).
+4. Phone par code enter karein → bot ka main session phone se link ho jata
+   hai (`database/auth` mein persist) → `✓ WhatsApp VERIFIED connection`.
+5. Restart ke baad bhi session rahega — dobara pair nahi karna padega.
+6. Agar bot pehle se connected hai → koi naya code generate **NAHI** hota
+   ("Already Connected" message aata hai).
+
+Invariants (code-enforced, `lib/whatsapp.js` + `lib/database.js`):
+- **Ek hi socket / ek hi auth dir** — duplicate initialization impossible.
+- Valid (unexpired) code exist kare → **WOHI code resend** hota hai —
+  doosra, alag code kabhi nahi.
+- **Single-flight**: in-process flag + cross-process file lock
+  (`database/.pairing.lock`, O_EXCL) — doosra bot instance / doosri request
+  concurrent code request nahi kar sakti (Railway `replicas: 1` bhi set hai).
+- **Reconnect safe**: registered session "open" event deta hai (QR nahi) →
+  pending pairing re-process nahi hoti → koi extra code nahi.
+- **Successful pairing** ("open") → codes/pending entry saaf → bot normal
+  authenticated mode mein chalta rehta hai.
+- Purana throwaway `database/auth_pair` design + `pair_guard.json` /
+  `pair_sent.json` files project se REMOVE ho chuke hain.
 
 ## 7. Telegram Admin Panel
 
